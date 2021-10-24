@@ -23,8 +23,8 @@ class MainActivity : AppCompatActivity() {
         setContentView(binding.root)
 
         // Tambahkan data stream dari inputan Email dilanjutkan dengan subscribe ke stream tersebut.
-        val emailStream = RxTextView.textChanges(binding.edEmail)
-            .skipInitialValue()
+        val emailStream = RxTextView.textChanges(binding.edEmail) // untuk membaca setiap perubahan pada EditText dan mengubahnya menjadi data stream.
+            .skipInitialValue() // untuk menghiraukan input awal.
             .map { email ->
                 !Patterns.EMAIL_ADDRESS.matcher(email).matches()
             }
@@ -35,11 +35,11 @@ class MainActivity : AppCompatActivity() {
 
         val passwordStream = RxTextView.textChanges(binding.edPassword)
             .skipInitialValue()
-            .map { password ->
-                password.length < 6
+            .map { password -> //  memeriksa apakah format valid
+                password.length < 6 // Jika format tidak valid maka ia akan mengembalikan nilai TRUE.
             }
         passwordStream.subscribe {
-            showPasswordMinimalAlert(it)
+            showPasswordMinimalAlert(it) // menampilkan peringatan jika hasilnya TRUE.
         }
 
         // passConf itu mengecek 2 inputan sekaligus, jadi hrs menggabungkan dua data tersebut dengan operator merge seperti berikut ini:
@@ -59,7 +59,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         // membaca ketiga data stream tersebut untuk menentukan apakah tombol diaktifkan atau tidak dgn operator combineLatest
-        val invalidFieldStream = Observable.combineLatest(
+        val invalidFieldStream = Observable.combineLatest( // operator combineLatest kita menggabungkan dan mengubah data di dalamnya.
             emailStream,
             passwordStream,
             passConfStream,
