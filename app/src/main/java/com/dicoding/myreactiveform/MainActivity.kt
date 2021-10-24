@@ -1,5 +1,6 @@
 package com.dicoding.myreactiveform
 
+import android.annotation.SuppressLint
 import android.os.Bundle
 import android.text.Editable
 import android.text.TextWatcher
@@ -7,106 +8,72 @@ import android.util.Patterns
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import com.dicoding.myreactiveform.databinding.ActivityMainBinding
+import com.jakewharton.rxbinding2.widget.RxTextView
+import io.reactivex.Observable
+import io.reactivex.functions.Function3
 
 class MainActivity : AppCompatActivity() {
 
-    private var emailValid = false
-    private var passwordValid = false
-    private var passwordConfirmationValid = false
-
     lateinit var binding: ActivityMainBinding
 
+    @SuppressLint("CheckResult")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        validateButton()
-
-        binding.edEmail.addTextChangedListener(object : TextWatcher {
-            override fun afterTextChanged(s: Editable?) {
+        // Tambahkan data stream dari inputan Email dilanjutkan dengan subscribe ke stream tersebut.
+        val emailStream = RxTextView.textChanges(binding.edEmail)
+            .skipInitialValue()
+            .map { email ->
+                !Patterns.EMAIL_ADDRESS.matcher(email).matches()
             }
-
-            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {
-            }
-
-            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
-                validateEmail()
-            }
-        })
-
-        binding.edPassword.addTextChangedListener(object : TextWatcher {
-            override fun afterTextChanged(s: Editable?) {
-            }
-
-            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {
-            }
-
-            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
-                validatePassword()
-            }
-        })
-
-        binding.edConfirmPassword.addTextChangedListener(object : TextWatcher {
-            override fun afterTextChanged(s: Editable?) {
-            }
-
-            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {
-            }
-
-            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
-                validatePasswordConfirmation()
-            }
-        })
-    }
-
-    fun validateEmail() {
-        // jika password tidak valid tampilkan peringatan
-        val input = binding.edEmail.text.toString()
-        if (!Patterns.EMAIL_ADDRESS.matcher(input).matches()) {
-            emailValid = false
-            showEmailExistAlert(true)
-        } else {
-            emailValid = true
-            showEmailExistAlert(false)
+        // di amatin datanya booleannya true apa false
+        emailStream.subscribe {
+            showEmailExistAlert(it)
         }
-        validateButton()
-    }
 
-    fun validatePassword() {
-        // jika password < 6 karakter tampilkan peringatan
-        val input = binding.edPassword.text.toString()
-        if (input.length < 6) {
-            passwordValid = false
-            showPasswordMinimalAlert(true)
-        } else {
-            passwordValid = true
-            showPasswordMinimalAlert(false)
+        val passwordStream = RxTextView.textChanges(binding.edPassword)
+            .skipInitialValue()
+            .map { password ->
+                password.length < 6
+            }
+        passwordStream.subscribe {
+            showPasswordMinimalAlert(it)
         }
-        validateButton()
-    }
 
-    fun validatePasswordConfirmation() {
-        // jika konfirmasi password tidak sesuai tampilkan peringatan
-        val input = binding.edConfirmPassword.text.toString()
-        if (input != binding.edPassword.text.toString()) {
-            passwordConfirmationValid = false
-            showPasswordConfirmationAlert(true)
-        } else {
-            passwordConfirmationValid = true
-            showPasswordConfirmationAlert(false)
+        // passConf itu mengecek 2 inputan sekaligus, jadi hrs menggabungkan dua data tersebut dengan operator merge seperti berikut ini:
+        val passConfStream = Observable.merge(
+            RxTextView.textChanges(binding.edPassword)
+                .map { password ->
+                    password.toString() != binding.edConfirmPassword.text.toString()
+                },
+            RxTextView.textChanges(binding.edConfirmPassword)
+                .map { passConf ->
+                    passConf.toString() != binding.edPassword.text.toString()
+                }
+        )
+
+        passConfStream.subscribe {
+            showPasswordConfirmationAlert(it)
         }
-        validateButton()
-    }
 
-    private fun validateButton() {
-        // jika semua field sudah terisi, enable button submit
-        if (emailValid && passwordValid && passwordConfirmationValid) {
-            binding.btnRegister.isEnabled = true
-            binding.btnRegister.setBackgroundColor(ContextCompat.getColor(this, R.color.purple_500))
-        } else {
-            binding.btnRegister.isEnabled = false
-            binding.btnRegister.setBackgroundColor(ContextCompat.getColor(this, android.R.color.darker_gray))
+        // membaca ketiga data stream tersebut untuk menentukan apakah tombol diaktifkan atau tidak dgn operator combineLatest
+        val invalidFieldStream = Observable.combineLatest(
+            emailStream,
+            passwordStream,
+            passConfStream,
+            Function3 { emailInvalid: Boolean, passwordInvalid: Boolean, passConfInvalid: Boolean ->
+                !emailInvalid && !passwordInvalid && !passConfInvalid
+            })
+        invalidFieldStream.subscribe { isValid ->
+            if (isValid) {
+                binding.btnRegister.isEnabled = true
+                binding.btnRegister.setBackgroundColor(ContextCompat.getColor(this, R.color.purple_500))
+            } else {
+                binding.btnRegister.isEnabled = false
+                binding.btnRegister.setBackgroundColor(ContextCompat.getColor(this, android.R.color.darker_gray))
+            }
         }
     }
 
